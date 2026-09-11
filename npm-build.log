@@ -1,0 +1,38 @@
+
+> osool-app@0.1.0 build
+> next build
+
+▲ Next.js 16.3.4 (Turbopack)
+✓ Running next.config.ts took 7.2s
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.8min
+  Running TypeScript ...
+  Finished TypeScript in 71s ...
+  Collecting page data using 1 worker ...
+  Generating static pages using 1 worker (0/6) ...
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+  Generating static pages using 1 worker (1/6) 
+  Generating static pages using 1 worker (2/6) 
+  Generating static pages using 1 worker (4/6) 
+✓ Generating static pages using 1 worker (6/6) in 3.1s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/financials
+├ ƒ /admin/library
+├ ƒ /admin/settings
+├ ƒ /admin/transactions
+├ ƒ /api/archive
+├ ƒ /api/daily-report
+├ ○ /login
+├ ƒ /me
+└ ○ /register
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
