@@ -13,7 +13,6 @@ create table if not exists public.profiles (
 );
 alter table public.profiles enable row level security;
 
--- دالة مساعدة: هل المستخدم الحالي مدير؟
 create or replace function public.is_admin()
 returns boolean language sql security definer stable as $$
   select exists (
@@ -54,7 +53,12 @@ create table if not exists public.transactions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.transactions add column if not exists created_by uuid references auth.users(id);
 alter table public.transactions enable row level security;
+drop policy if exists tx_select on public.transactions;
+drop policy if exists tx_insert on public.transactions;
+drop policy if exists tx_update on public.transactions;
+drop policy if exists tx_delete on public.transactions;
 create policy tx_select on public.transactions for select
   using (public.is_admin() or user_id = auth.uid() or created_by = auth.uid());
 create policy tx_insert on public.transactions for insert
@@ -76,6 +80,7 @@ create table if not exists public.payments (
   created_at timestamptz not null default now()
 );
 alter table public.payments enable row level security;
+drop policy if exists pay_all on public.payments;
 create policy pay_all on public.payments for all using (public.is_admin()) with check (public.is_admin());
 
 -- ---------- المصروفات (admin only) ----------
@@ -90,6 +95,7 @@ create table if not exists public.expenses (
   created_at timestamptz not null default now()
 );
 alter table public.expenses enable row level security;
+drop policy if exists exp_all on public.expenses;
 create policy exp_all on public.expenses for all using (public.is_admin()) with check (public.is_admin());
 
 -- ---------- الإجازات (public read, admin write) ----------
@@ -100,6 +106,8 @@ create table if not exists public.holidays (
   created_at timestamptz not null default now()
 );
 alter table public.holidays enable row level security;
+drop policy if exists hol_read on public.holidays;
+drop policy if exists hol_write on public.holidays;
 create policy hol_read on public.holidays for select using (true);
 create policy hol_write on public.holidays for all
   using (public.is_admin()) with check (public.is_admin());
@@ -122,6 +130,8 @@ create table if not exists public.library_entries (
   created_at timestamptz not null default now()
 );
 alter table public.library_entries enable row level security;
+drop policy if exists lib_read on public.library_entries;
+drop policy if exists lib_write on public.library_entries;
 create policy lib_read on public.library_entries for select using (true);
 create policy lib_write on public.library_entries for all
   using (public.is_admin()) with check (public.is_admin());
@@ -130,13 +140,18 @@ create policy lib_write on public.library_entries for all
 create table if not exists public.modification_requests (
   id uuid primary key default gen_random_uuid(),
   transaction_id text not null,
+  created_by uuid references auth.users(id),
   modification_type text not null,
   status text not null default 'pending' check (status in ('pending','accepted','rejected')),
   impact_report text,
   admin_notes text,
   created_at timestamptz not null default now()
 );
+alter table public.modification_requests add column if not exists created_by uuid references auth.users(id);
 alter table public.modification_requests enable row level security;
+drop policy if exists mod_read on public.modification_requests;
+drop policy if exists mod_insert on public.modification_requests;
+drop policy if exists mod_write on public.modification_requests;
 create policy mod_read on public.modification_requests for select
   using (public.is_admin() or created_by = auth.uid());
 create policy mod_insert on public.modification_requests for insert
@@ -152,6 +167,7 @@ create table if not exists public.system_settings (
   created_at timestamptz not null default now()
 );
 alter table public.system_settings enable row level security;
+drop policy if exists sys_all on public.system_settings;
 create policy sys_all on public.system_settings for all
   using (public.is_admin()) with check (public.is_admin());
 
@@ -169,6 +185,7 @@ create table if not exists public.appointments (
   created_at timestamptz not null default now()
 );
 alter table public.appointments enable row level security;
+drop policy if exists apt_all on public.appointments;
 create policy apt_all on public.appointments for all
   using (public.is_admin()) with check (public.is_admin());
 
@@ -188,21 +205,36 @@ end;
 $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+after insert on auth.users
+for each row execute function public.handle_new_user();
 
--- إصلاحات وتحديثات الإصدار الحالي
-insert into storage.buckets (id, name, public) values ('transaction-files', 'transaction-files', true) on conflict (id) do update set public = true;
+-- ---------- Storage للمرفقات ----------
+insert into storage.buckets (id, name, public)
+values ('transaction-files', 'transaction-files', true)
+on conflict (id) do update set public = true;
 drop policy if exists transaction_files_read on storage.objects;
 drop policy if exists transaction_files_insert on storage.objects;
-create policy transaction_files_read on storage.objects for select using (bucket_id = 'transaction-files');
-create policy transaction_files_insert on storage.objects for insert with check (bucket_id = 'transaction-files' and auth.uid() is not null);
+create policy transaction_files_read on storage.objects
+  for select using (bucket_id = 'transaction-files');
+create policy transaction_files_insert on storage.objects
+  for insert with check (bucket_id = 'transaction-files' and auth.uid() is not null);
 
+-- ---------- تحديث أرصدة المعاملة عند تسجيل الدفع ----------
 create or replace function public.sync_transaction_paid_fees()
 returns trigger language plpgsql security definer as $$
 begin
-  update public.transactions set paid_fees = coalesce((select sum(amount) from public.payments where transaction_id = new.transaction_id), 0), remaining = greatest(coalesce(agreed_fees, expected_fees, 0) - coalesce((select sum(amount) from public.payments where transaction_id = new.transaction_id), 0), 0), updated_at = now() where transaction_id = coalesce(new.transaction_id, old.transaction_id);
-  return coalesce(new, old);
-end; $$;
+  update public.transactions
+  set paid_fees = coalesce((select sum(amount) from public.payments where transaction_id = coalesce(new.transaction_id, old.transaction_id)), 0),
+      remaining = greatest(coalesce(agreed_fees, expected_fees, 0) - coalesce((select sum(amount) from public.payments where transaction_id = coalesce(new.transaction_id, old.transaction_id)), 0), 0),
+      updated_at = now()
+  where transaction_id = coalesce(new.transaction_id, old.transaction_id);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
 drop trigger if exists payments_sync_transaction on public.payments;
-create trigger payments_sync_transaction after insert or update or delete on public.payments for each row execute function public.sync_transaction_paid_fees();
+create trigger payments_sync_transaction
+after insert or update or delete on public.payments
+for each row execute function public.sync_transaction_paid_fees();
