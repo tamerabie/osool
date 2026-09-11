@@ -42,11 +42,13 @@ export async function createTransaction(formData: FormData) {
 
   const record = {
     user_id: user.id,
+    created_by: user.id,
     client_name: formData.get("client_name") as string,
     transaction_type: formData.get("transaction_type") as string,
     governorate: formData.get("governorate") as string,
     description: formData.get("description") as string,
     status: "pending_review",
+    files: JSON.parse(String(formData.get("files") || "[]")),
   };
   const { error } = await supabase.from("transactions").insert(record);
   if (error) redirect(`/me?error=${encodeURIComponent(error.message)}`);

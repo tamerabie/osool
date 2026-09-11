@@ -15,6 +15,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/transactions", label: "المعاملات" },
     { href: "/admin/financials", label: "الإيرادات والمصروفات" },
     { href: "/admin/library", label: "مكتبة أصول" },
+    { href: "/admin/appointments", label: "تقويم المراجعات" },
+    { href: "/admin/assistant", label: "المساعد OAA" },
     { href: "/admin/settings", label: "الإعدادات" },
   ];
 

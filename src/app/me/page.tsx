@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
-import { createTransaction } from "@/lib/actions";
+import TransactionForm from "@/app/me/TransactionForm";
 import { signOut } from "@/lib/actions";
 import {
   TRANSACTION_TYPES,
@@ -62,22 +62,7 @@ export default async function MePage({
           {sp.error && (
             <p className="mt-3 rounded-lg bg-red-50 text-red-700 px-3 py-2 text-sm">{sp.error}</p>
           )}
-          <form action={createTransaction} className="mt-4 space-y-4">
-            <Field label="اسم العميل" name="client_name" required />
-            <Select label="نوع المعاملة" name="transaction_type" options={[...TRANSACTION_TYPES]} />
-            <Select label="المحافظة" name="governorate" options={[...GOVERNORATES]} />
-            <div>
-              <label className="block text-sm font-semibold mb-1.5">وصف المعاملة</label>
-              <textarea
-                name="description"
-                rows={4}
-                className="w-full rounded-xl border border-border px-4 py-2.5 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-              />
-            </div>
-            <button className="w-full h-12 rounded-xl bg-brand font-semibold text-white hover:bg-brand-dark transition-colors">
-              إرسال المعاملة
-            </button>
-          </form>
+          <TransactionForm types={[...TRANSACTION_TYPES]} governorates={[...GOVERNORATES]} />
         </section>
 
         <section>

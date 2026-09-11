@@ -28,6 +28,7 @@ create table if not exists public.transactions (
   transaction_id text unique,
   client_name text,
   user_id uuid references auth.users(id),
+  created_by uuid references auth.users(id),
   transaction_type text,
   governorate text,
   description text,
@@ -189,3 +190,19 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- إصلاحات وتحديثات الإصدار الحالي
+insert into storage.buckets (id, name, public) values ('transaction-files', 'transaction-files', true) on conflict (id) do update set public = true;
+drop policy if exists transaction_files_read on storage.objects;
+drop policy if exists transaction_files_insert on storage.objects;
+create policy transaction_files_read on storage.objects for select using (bucket_id = 'transaction-files');
+create policy transaction_files_insert on storage.objects for insert with check (bucket_id = 'transaction-files' and auth.uid() is not null);
+
+create or replace function public.sync_transaction_paid_fees()
+returns trigger language plpgsql security definer as $$
+begin
+  update public.transactions set paid_fees = coalesce((select sum(amount) from public.payments where transaction_id = new.transaction_id), 0), remaining = greatest(coalesce(agreed_fees, expected_fees, 0) - coalesce((select sum(amount) from public.payments where transaction_id = new.transaction_id), 0), 0), updated_at = now() where transaction_id = coalesce(new.transaction_id, old.transaction_id);
+  return coalesce(new, old);
+end; $$;
+drop trigger if exists payments_sync_transaction on public.payments;
+create trigger payments_sync_transaction after insert or update or delete on public.payments for each row execute function public.sync_transaction_paid_fees();
