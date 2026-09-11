@@ -92,6 +92,7 @@ https://github.com/settings/tokens بصلاحيات `repo`، أو زر **Sign in
 أضف في Vercel المتغيرات التالية:
 - `CRON_SECRET`: قيمة عشوائية طويلة يستعملها مسار التقرير اليومي.
 - `ADMIN_EMAIL`: البريد الذي يستقبل التقرير اليومي.
+- `ADMIN_USERNAME`: اسم المستخدم في صفحة الدخول الإدارية، والافتراضي `Admin`.
 - `OPENAI_API_KEY`: مفتاح مزود متوافق مع OpenAI لتشغيل المساعد OAA؛ قبل إضافته تظهر رسالة إرشادية بدلاً من فشل الصفحة.
 - `OPENAI_ASSISTANT_MODEL`: اختياري، والافتراضي `gpt-4o-mini`.
 
@@ -99,3 +100,6 @@ https://github.com/settings/tokens بصلاحيات `repo`، أو زر **Sign in
 
 ### التقرير اليومي على Vercel Hobby
 يمكن استدعاء `/api/daily-report` بترويسة `Authorization: Bearer <CRON_SECRET>`. خطة Vercel المجانية تدعم Cron Jobs مرة واحدة يومياً فقط؛ لذلك اضبط الجدولة اليومية في `vercel.json` أو لوحة Vercel، ولا تعتمد على تشغيل كل ساعة أو كل دقيقة في الخطة المجانية.
+
+## الدخول الإداري
+صفحة الدخول المنفصلة هي `/admin-login`. اسم المستخدم الافتراضي هو `Admin`، وتُتحقق كلمة المرور عبر حساب `ADMIN_EMAIL` في Supabase، ولا تُحفظ كلمة المرور داخل الكود. يجب أن يكون هذا الحساب موجوداً في Supabase وأن تكون قيمة `role` له في جدول `profiles` هي `admin`.
